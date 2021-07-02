@@ -43,7 +43,6 @@ class FileManagerViewController: UIViewController, AlertPresenter {
     
     // MARK: - Life cycle
     override func viewDidLoad() {
-        print(type(of: self), #function)
         super.viewDidLoad()
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "Add directory", style: .plain, target: self, action: #selector(addDirectory(_:)))
@@ -51,10 +50,16 @@ class FileManagerViewController: UIViewController, AlertPresenter {
         
         setupSubviews()
     }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard Settings.shared.haveUpdates else { return }
+        Directory.sort(objects: &directory.objects)
+        tableView.reloadData()
+    }
     
     // MARK: - Private methods
     private func setupSubviews() {
-        
         view.addSubview(tableView)
         
         NSLayoutConstraint.activate([
@@ -68,8 +73,7 @@ class FileManagerViewController: UIViewController, AlertPresenter {
 
     // MARK: - Actions
     @objc private func addDirectory(_ sender: Any) {
-        print(type(of: self), #function, type(of: sender))
-        
+
         directoryName = nil
         
         let alertController = UIAlertController(title: "New directory", message: nil, preferredStyle: .alert)
@@ -119,23 +123,27 @@ extension FileManagerViewController: UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: String(describing: UITableViewCell.self)) else {
-            return UITableViewCell()
-        }
-        
+
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: String(describing: UITableViewCell.self))
+
         let fileSystemObject = directory.objects[indexPath.row]
         cell.textLabel?.text = fileSystemObject.name
-        
+        cell.textLabel?.numberOfLines = 0
+        cell.detailTextLabel?.text = nil
+        cell.accessoryType = .none
+
         switch fileSystemObject.type {
         case .file:
             cell.imageView?.image = UIImage(systemName: "photo")
-            cell.accessoryType = .none
+            if let fileSize = fileSystemObject.fileSize,
+               Settings.shared.showSize {
+                cell.detailTextLabel?.text = ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file)
+            }
         case .directory:
             cell.imageView?.image = UIImage(systemName: "folder")
             cell.accessoryType = .disclosureIndicator
         default:
             cell.imageView?.image = UIImage(systemName: "folder")
-            cell.accessoryType = .none
         }
         
         return cell
@@ -190,8 +198,7 @@ extension FileManagerViewController: UITableViewDelegate {
     }
 }
 
-// MARK: - PHPickerViewControllerDelegate
-
+// MARK: - UIImagePickerControllerDelegate
 extension FileManagerViewController:  UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
